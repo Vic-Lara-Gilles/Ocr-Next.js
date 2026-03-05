@@ -1,6 +1,6 @@
 import axios, { AxiosInstance } from "axios";
 
-import { Document } from "@/types/document";
+import { ChatResponse, Document, IndexResponse } from "@/types/document";
 
 const apiClient: AxiosInstance = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL,
@@ -27,3 +27,14 @@ export async function listDocuments(): Promise<Document[]> {
   const response = await apiClient.get<Document[]>("/api/documents");
   return response.data;
 }
+
+export async function indexDocument(id: string): Promise<IndexResponse> {
+  const response = await apiClient.post<IndexResponse>(`/api/rag/${id}`);
+  return response.data;
+}
+
+export async function chatWithDocument(id: string, question: string): Promise<ChatResponse> {
+  const response = await apiClient.post<ChatResponse>(`/api/chat/${id}`, { question });
+  return response.data;
+}
+

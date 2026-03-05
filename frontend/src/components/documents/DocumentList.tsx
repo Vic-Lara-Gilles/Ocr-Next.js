@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { ReactElement } from "react";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -13,6 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useIndexDocument } from "@/hooks/useRag";
 import { listDocuments } from "@/services/api";
 import { DocumentStatus } from "@/types/document";
 
@@ -34,6 +36,7 @@ export function DocumentList(): ReactElement {
     queryKey: ["documents"],
     queryFn: listDocuments,
   });
+  const { mutate: indexDoc, isPending, variables: indexingId } = useIndexDocument();
 
   if (isLoading) {
     return <p className="text-sm text-muted-foreground">Cargando documentos...</p>;
@@ -53,6 +56,8 @@ export function DocumentList(): ReactElement {
             <TableHead>Estado</TableHead>
             <TableHead>Creado</TableHead>
             <TableHead>Resultado</TableHead>
+            <TableHead>RAG</TableHead>
+            <TableHead>Chat</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -68,6 +73,25 @@ export function DocumentList(): ReactElement {
                 <Link className="text-sm font-medium text-blue-700 hover:underline" href={`/results/${document.id}`}>
                   Ver
                 </Link>
+              </TableCell>
+              <TableCell>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={document.status !== "completed" || (isPending && indexingId === document.id)}
+                  onClick={() => indexDoc(document.id)}
+                >
+                  {isPending && indexingId === document.id ? "Indexando..." : "Indexar"}
+                </Button>
+              </TableCell>
+              <TableCell>
+                {document.status === "completed" ? (
+                  <Link className="text-sm font-medium text-blue-700 hover:underline" href={`/chat/${document.id}`}>
+                    Chat
+                  </Link>
+                ) : (
+                  <span className="text-sm text-muted-foreground">—</span>
+                )}
               </TableCell>
             </TableRow>
           ))}

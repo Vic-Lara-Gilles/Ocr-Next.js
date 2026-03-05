@@ -21,3 +21,19 @@ export interface Document {
   created_at: string;
   updated_at: string;
 }
+
+export interface ChatSource {
+  chunk_index: number;
+  content: string;
+}
+
+export interface ChatResponse {
+  answer: string;
+  sources: ChatSource[];
+}
+
+export interface IndexResponse {
+  document_id: string;
+  chunks_indexed: number;
+  already_indexed: boolean;
+}
