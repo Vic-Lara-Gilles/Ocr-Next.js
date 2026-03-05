@@ -1,4 +1,3 @@
-import Link from "next/link";
 
 import { UploadZone } from "@/components/upload/UploadZone";
 
@@ -11,9 +10,6 @@ export default function Home() {
           Extrae texto, tablas y campos estructurados desde documentos PDF con un pipeline OCR escalable.
         </p>
         <UploadZone />
-        <Link href="/dashboard" className="text-sm font-semibold text-blue-700 hover:underline">
-          Ir al dashboard de documentos
-        </Link>
       </main>
     </div>
   );
