@@ -7,6 +7,7 @@ import re
 from typing import Any
 
 from google import genai
+from google.genai import types
 from PIL import Image
 
 from app.config import settings
@@ -57,6 +58,9 @@ class GeminiOCRService(OCRService):
         response = self._client.models.generate_content(
             model="gemini-2.5-flash",
             contents=[PROMPT, image],
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+            ),
         )
         if not response or not getattr(response, "text", None):
             logger.error("Empty response from Gemini")
