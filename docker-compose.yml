@@ -41,7 +41,7 @@ services:
       - ocr-network
 
   db:
-    image: postgres:15-alpine
+    image: pgvector/pgvector:pg15
     environment:
       POSTGRES_USER: ocr
       POSTGRES_PASSWORD: ocr
