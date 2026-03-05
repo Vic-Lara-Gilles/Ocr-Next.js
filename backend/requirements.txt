@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+python-multipart
+pdf2image
+opencv-python-headless
+pillow
+google-generativeai
+psycopg2-binary
+sqlalchemy
+alembic
+python-dotenv
+pydantic-settings
+celery
+redis
