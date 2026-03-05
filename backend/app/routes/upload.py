@@ -14,28 +14,11 @@ from app.logger import get_logger
 from app.models.document import DocumentStatus
 from app.repositories.document_repository import DocumentRepository
 from app.schemas.document import DocumentRead
-from app.services.gemini_service import GeminiOCRService
-from app.services.pdf_service import PDFService
 from app.tasks.ocr_task import process_document_task
 
 logger = get_logger("ocr.upload")
 
 router = APIRouter(prefix="/api", tags=["upload"])
-
-
-def _merge_results(results: list[dict]) -> tuple[str, dict]:
-    full_text = "\n\n".join(
-        r.get("texto", "") for r in results if isinstance(r, dict)
-    ).strip()
-    tables = []
-    fields: dict[str, str] = {}
-    for result in results:
-        if not isinstance(result, dict):
-            continue
-        tables.extend(result.get("tablas", []))
-        for key, value in result.get("campos", {}).items():
-            fields[str(key)] = str(value)
-    return full_text, {"texto": full_text, "tablas": tables, "campos": fields}
 
 
 @router.post("/upload", response_model=DocumentRead)
@@ -76,28 +59,8 @@ async def upload_document(
     final_pdf_path = os.path.join(settings.TEMP_DIR, f"{document.id}.pdf")
     os.replace(staging_path, final_pdf_path)
 
-    if pages_count < settings.MAX_SYNC_PAGES:
-        try:
-            logger.info("Sync processing id=%s", document.id)
-            repository.update_status(document, DocumentStatus.PROCESSING)
-            pdf_service = PDFService()
-            ocr_service = GeminiOCRService()
-            images = pdf_service.process_pdf(final_pdf_path)
-            page_results = ocr_service.process_images_parallel(images)
-            raw_text, structured_json = _merge_results(page_results)
-            document = repository.update_result(
-                document, raw_text=raw_text, structured_json=structured_json
-            )
-            logger.info("Sync OCR complete id=%s", document.id)
-        except Exception as exc:
-            logger.error("Sync OCR failed id=%s: %s", document.id, exc, exc_info=True)
-            repository.update_status(document, DocumentStatus.FAILED)
-            raise HTTPException(
-                status_code=500, detail=f"Processing error: {exc}"
-            ) from exc
-    else:
-        logger.info("Dispatching async task id=%s pages=%d", document.id, pages_count)
-        document = repository.update_status(document, DocumentStatus.PROCESSING)
-        process_document_task.delay(str(document.id))
+    logger.info("Dispatching async task id=%s pages=%d", document.id, pages_count)
+    document = repository.update_status(document, DocumentStatus.PROCESSING)
+    process_document_task.delay(str(document.id))
 
     return DocumentRead.model_validate(document)
