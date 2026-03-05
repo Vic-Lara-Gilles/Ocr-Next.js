@@ -6,7 +6,7 @@ import json
 import re
 from typing import Any
 
-import google.generativeai as genai
+from google import genai
 from PIL import Image
 
 from app.config import settings
@@ -35,8 +35,7 @@ class OCRService(abc.ABC):
 
 class GeminiOCRService(OCRService):
     def __init__(self) -> None:
-        genai.configure(api_key=settings.GEMINI_API_KEY)
-        self.model = genai.GenerativeModel("gemini-2.5-flash")
+        self._client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
     def _extract_json(self, response_text: str) -> dict[str, Any]:
         cleaned = response_text.strip()
@@ -55,7 +54,10 @@ class GeminiOCRService(OCRService):
 
     def process_image(self, image: Image.Image) -> dict[str, Any]:
         logger.info("Calling Gemini OCR (image size=%dx%d)", image.width, image.height)
-        response = self.model.generate_content([PROMPT, image])
+        response = self._client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=[PROMPT, image],
+        )
         if not response or not getattr(response, "text", None):
             logger.error("Empty response from Gemini")
             raise ValueError("Empty response from Gemini OCR")

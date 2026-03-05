@@ -3,7 +3,8 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 from app.config import settings
 from app.logger import get_logger
@@ -21,7 +22,7 @@ CHUNK_OVERLAP = 100
 
 class RagService:
     def __init__(self) -> None:
-        genai.configure(api_key=settings.GEMINI_API_KEY)
+        self._client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
     # ------------------------------------------------------------------ #
     # Chunking                                                             #
@@ -43,20 +44,20 @@ class RagService:
 
     def _embed(self, texts: list[str]) -> list[list[float]]:
         """Batch embed using text-embedding-004 (768 dims, free tier)."""
-        result = genai.embed_content(
-            model="models/text-embedding-004",
-            content=texts,
-            task_type="retrieval_document",
+        result = self._client.models.embed_content(
+            model="text-embedding-004",
+            contents=texts,
+            config=types.EmbedContentConfig(task_type="RETRIEVAL_DOCUMENT"),
         )
-        return result["embedding"]
+        return [e.values for e in result.embeddings]
 
     def _embed_query(self, text: str) -> list[float]:
-        result = genai.embed_content(
-            model="models/text-embedding-004",
-            content=text,
-            task_type="retrieval_query",
+        result = self._client.models.embed_content(
+            model="text-embedding-004",
+            contents=text,
+            config=types.EmbedContentConfig(task_type="RETRIEVAL_QUERY"),
         )
-        return result["embedding"]
+        return result.embeddings[0].values
 
     # ------------------------------------------------------------------ #
     # Public API                                                           #
@@ -111,8 +112,10 @@ class RagService:
             f"Pregunta: {question}"
         )
 
-        model = genai.GenerativeModel(CHAT_MODEL)
-        response = model.generate_content(prompt)
+        response = self._client.models.generate_content(
+            model=CHAT_MODEL,
+            contents=prompt,
+        )
         answer_text = (
             response.text.strip() if response and response.text else "Sin respuesta."
         )

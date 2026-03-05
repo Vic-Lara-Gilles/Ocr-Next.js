@@ -4,7 +4,7 @@ python-multipart
 pdf2image
 opencv-python-headless
 pillow
-google-generativeai
+google-genai
 psycopg2-binary
 sqlalchemy
 alembic
