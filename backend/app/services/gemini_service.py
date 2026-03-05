@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import abc
+import concurrent.futures
 import json
 import re
 from typing import Any
@@ -10,6 +11,9 @@ from PIL import Image
 
 from app.config import settings
 from app.logger import get_logger
+
+# Max simultaneous Gemini requests — stays within 10 RPM free-tier limit
+GEMINI_CONCURRENCY = 5
 
 logger = get_logger("ocr.gemini")
 
@@ -32,7 +36,7 @@ class OCRService(abc.ABC):
 class GeminiOCRService(OCRService):
     def __init__(self) -> None:
         genai.configure(api_key=settings.GEMINI_API_KEY)
-        self.model = genai.GenerativeModel("gemini-2.0-flash-lite")
+        self.model = genai.GenerativeModel("gemini-2.5-flash")
 
     def _extract_json(self, response_text: str) -> dict[str, Any]:
         cleaned = response_text.strip()
@@ -69,3 +73,19 @@ class GeminiOCRService(OCRService):
                 "JSON parse error: %s | raw=%.200s", exc, response.text, exc_info=True
             )
             raise
+
+    def process_images_parallel(
+        self, images: list[Image.Image]
+    ) -> list[dict[str, Any]]:
+        """Process all pages concurrently, preserving page order."""
+        logger.info(
+            "Processing %d pages in parallel (max_workers=%d)",
+            len(images),
+            GEMINI_CONCURRENCY,
+        )
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=GEMINI_CONCURRENCY
+        ) as executor:
+            results = list(executor.map(self.process_image, images))
+        logger.info("Parallel OCR complete: %d pages", len(results))
+        return results

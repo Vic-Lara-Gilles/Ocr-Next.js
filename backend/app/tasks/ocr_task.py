@@ -51,7 +51,7 @@ def process_document_task(document_id: str) -> None:
         images = pdf_service.process_pdf(pdf_path)
         logger.info("PDF rendered id=%s pages=%d", document_id, len(images))
 
-        page_results = [ocr_service.process_image(image) for image in images]
+        page_results = ocr_service.process_images_parallel(images)
         raw_text, structured_json = _merge_results(page_results)
         repository.update_result(
             document, raw_text=raw_text, structured_json=structured_json

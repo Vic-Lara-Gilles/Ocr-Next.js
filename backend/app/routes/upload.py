@@ -83,7 +83,7 @@ async def upload_document(
             pdf_service = PDFService()
             ocr_service = GeminiOCRService()
             images = pdf_service.process_pdf(final_pdf_path)
-            page_results = [ocr_service.process_image(image) for image in images]
+            page_results = ocr_service.process_images_parallel(images)
             raw_text, structured_json = _merge_results(page_results)
             document = repository.update_result(
                 document, raw_text=raw_text, structured_json=structured_json
