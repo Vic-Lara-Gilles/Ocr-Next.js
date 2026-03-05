@@ -21,8 +21,12 @@ export function useDocumentStatus(documentId: string | undefined): UseDocumentSt
       if (status === "completed" || status === "failed") {
         return false;
       }
+      if (data?.state.error) {
+        return false;
+      }
       return 2000;
     },
+    retry: false,
   });
 
   return {
