@@ -9,45 +9,63 @@ import google.generativeai as genai
 from PIL import Image
 
 from app.config import settings
+from app.logger import get_logger
+
+logger = get_logger("ocr.gemini")
 
 
 PROMPT = (
-	"Extract all text and tables from this document image. Return only a valid JSON object "
-	"with three fields: texto containing the full plain text as a string, tablas containing "
-	"an array of objects each with headers as array of strings and rows as array of arrays of "
-	"strings, and campos containing a flat object with key-value pairs for any dates amounts IDs "
-	"names or relevant structured data found. Do not return anything outside the JSON object."
+    "Extract all text and tables from this document image. Return only a valid JSON object "
+    "with three fields: texto containing the full plain text as a string, tablas containing "
+    "an array of objects each with headers as array of strings and rows as array of arrays of "
+    "strings, and campos containing a flat object with key-value pairs for any dates amounts IDs "
+    "names or relevant structured data found. Do not return anything outside the JSON object."
 )
 
 
 class OCRService(abc.ABC):
-	@abc.abstractmethod
-	def process_image(self, image: Image.Image) -> dict[str, Any]:
-		raise NotImplementedError
+    @abc.abstractmethod
+    def process_image(self, image: Image.Image) -> dict[str, Any]:
+        raise NotImplementedError
 
 
 class GeminiOCRService(OCRService):
-	def __init__(self) -> None:
-		genai.configure(api_key=settings.GEMINI_API_KEY)
-		self.model = genai.GenerativeModel("gemini-2.0-flash")
+    def __init__(self) -> None:
+        genai.configure(api_key=settings.GEMINI_API_KEY)
+        self.model = genai.GenerativeModel("gemini-2.0-flash-lite")
 
-	def _extract_json(self, response_text: str) -> dict[str, Any]:
-		cleaned = response_text.strip()
-		fenced_match = re.search(r"```(?:json)?\s*(\{.*\})\s*```", cleaned, re.DOTALL)
-		if fenced_match:
-			cleaned = fenced_match.group(1)
+    def _extract_json(self, response_text: str) -> dict[str, Any]:
+        cleaned = response_text.strip()
+        fenced_match = re.search(r"```(?:json)?\s*(\{.*\})\s*```", cleaned, re.DOTALL)
+        if fenced_match:
+            cleaned = fenced_match.group(1)
 
-		data = json.loads(cleaned)
-		if not isinstance(data, dict):
-			raise ValueError("Gemini response is not a JSON object")
+        data = json.loads(cleaned)
+        if not isinstance(data, dict):
+            raise ValueError("Gemini response is not a JSON object")
 
-		data.setdefault("texto", "")
-		data.setdefault("tablas", [])
-		data.setdefault("campos", {})
-		return data
+        data.setdefault("texto", "")
+        data.setdefault("tablas", [])
+        data.setdefault("campos", {})
+        return data
 
-	def process_image(self, image: Image.Image) -> dict[str, Any]:
-		response = self.model.generate_content([PROMPT, image])
-		if not response or not getattr(response, "text", None):
-			raise ValueError("Empty response from Gemini OCR")
-		return self._extract_json(response.text)
+    def process_image(self, image: Image.Image) -> dict[str, Any]:
+        logger.info("Calling Gemini OCR (image size=%dx%d)", image.width, image.height)
+        response = self.model.generate_content([PROMPT, image])
+        if not response or not getattr(response, "text", None):
+            logger.error("Empty response from Gemini")
+            raise ValueError("Empty response from Gemini OCR")
+        try:
+            result = self._extract_json(response.text)
+            logger.info(
+                "Gemini OCR success: %d chars, %d tables, %d campos",
+                len(result.get("texto", "")),
+                len(result.get("tablas", [])),
+                len(result.get("campos", {})),
+            )
+            return result
+        except Exception as exc:
+            logger.error(
+                "JSON parse error: %s | raw=%.200s", exc, response.text, exc_info=True
+            )
+            raise
