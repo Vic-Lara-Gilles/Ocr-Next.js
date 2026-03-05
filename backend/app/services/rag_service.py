@@ -23,11 +23,6 @@ CHUNK_OVERLAP = 100
 class RagService:
     def __init__(self) -> None:
         self._client = genai.Client(api_key=settings.GEMINI_API_KEY)
-        # text-embedding-004 is only available on v1, not v1beta
-        self._embed_client = genai.Client(
-            api_key=settings.GEMINI_API_KEY,
-            http_options={"api_version": "v1"},
-        )
 
     # ------------------------------------------------------------------ #
     # Chunking                                                             #
@@ -48,19 +43,25 @@ class RagService:
     # ------------------------------------------------------------------ #
 
     def _embed(self, texts: list[str]) -> list[list[float]]:
-        """Batch embed using text-embedding-004 (768 dims, free tier)."""
-        result = self._embed_client.models.embed_content(
-            model="text-embedding-004",
+        """Batch embed using gemini-embedding-001 (768 dims via output_dimensionality)."""
+        result = self._client.models.embed_content(
+            model="gemini-embedding-001",
             contents=texts,
-            config=types.EmbedContentConfig(task_type="RETRIEVAL_DOCUMENT"),
+            config=types.EmbedContentConfig(
+                task_type="RETRIEVAL_DOCUMENT",
+                output_dimensionality=768,
+            ),
         )
         return [e.values for e in result.embeddings]
 
     def _embed_query(self, text: str) -> list[float]:
-        result = self._embed_client.models.embed_content(
-            model="text-embedding-004",
+        result = self._client.models.embed_content(
+            model="gemini-embedding-001",
             contents=text,
-            config=types.EmbedContentConfig(task_type="RETRIEVAL_QUERY"),
+            config=types.EmbedContentConfig(
+                task_type="RETRIEVAL_QUERY",
+                output_dimensionality=768,
+            ),
         )
         return result.embeddings[0].values
 
