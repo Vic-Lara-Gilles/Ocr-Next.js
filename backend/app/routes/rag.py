@@ -54,7 +54,9 @@ def index_document(document_id: UUID, db: Session = Depends(get_db)) -> IndexRes
     already_indexed = chunk_repo.count_by_document(document_id) > 0
 
     rag = RagService()
-    count = rag.index_document(document_id, document.raw_text, chunk_repo, filename=document.filename)
+    count = rag.index_document(
+        document_id, document.raw_text, chunk_repo, filename=document.filename
+    )
     logger.info("Indexed document_id=%s chunks=%d", document_id, count)
     return IndexResponse(
         document_id=document_id, chunks_indexed=count, already_indexed=already_indexed

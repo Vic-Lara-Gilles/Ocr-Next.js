@@ -20,6 +20,10 @@ CHUNK_SIZE = 1200
 CHUNK_OVERLAP = 150
 # How many chunks to retrieve per query
 TOP_K = 8
+# Candidates fetched by each search leg before fusion
+CANDIDATES = 20
+# RRF constant — 60 is the standard value from the original paper
+RRF_K = 60
 # Separators tried in order: prefer paragraph → line → sentence → word
 _SEPARATORS = ["\n\n", "\n", ". ", " "]
 
@@ -94,11 +98,66 @@ class RagService:
         return result.embeddings[0].values
 
     # ------------------------------------------------------------------ #
+    # Hybrid search (vector + FTS + RRF re-ranking)                        #
+    # ------------------------------------------------------------------ #
+
+    def _hybrid_search(
+        self,
+        document_id: uuid.UUID,
+        question: str,
+        query_emb: list[float],
+        repo: ChunkRepository,
+    ) -> list[DocumentChunk]:
+        """Mejora 4+5: combine cosine vector search with PostgreSQL full-text
+        search, then fuse rankings via Reciprocal Rank Fusion (RRF).
+
+        - Vector leg: top-CANDIDATES by cosine distance (semantic similarity)
+        - FTS leg:    top-CANDIDATES by ts_rank (keyword / BM25-style match)
+        - RRF score:  sum of 1/(RRF_K + rank_i) across both legs
+        - Final:      top-TOP_K chunks by descending RRF score
+
+        This helps when the user asks for exact terms (artículo 14-B) that
+        a pure vector search might miss because they are semantically neutral.
+        """
+        vector_results = repo.vector_search(
+            document_id, query_emb, candidates=CANDIDATES
+        )
+        fts_results = repo.fulltext_search(document_id, question, candidates=CANDIDATES)
+
+        # Accumulate RRF scores keyed by chunk id
+        scores: dict[uuid.UUID, float] = {}
+        for rank, (chunk, _) in enumerate(vector_results, start=1):
+            scores[chunk.id] = scores.get(chunk.id, 0.0) + 1.0 / (RRF_K + rank)
+        for rank, (chunk, _) in enumerate(fts_results, start=1):
+            scores[chunk.id] = scores.get(chunk.id, 0.0) + 1.0 / (RRF_K + rank)
+
+        # Build a deduped map of all candidate chunks
+        all_chunks: dict[uuid.UUID, DocumentChunk] = {}
+        for chunk, _ in vector_results + fts_results:
+            all_chunks[chunk.id] = chunk
+
+        sorted_ids = sorted(scores, key=lambda cid: scores[cid], reverse=True)
+        top = [all_chunks[cid] for cid in sorted_ids[:TOP_K]]
+
+        logger.debug(
+            "Hybrid search document_id=%s vector=%d fts=%d fused→%d",
+            document_id,
+            len(vector_results),
+            len(fts_results),
+            len(top),
+        )
+        return top
+
+    # ------------------------------------------------------------------ #
     # Public API                                                           #
     # ------------------------------------------------------------------ #
 
     def index_document(
-        self, document_id: uuid.UUID, raw_text: str, repo: ChunkRepository, filename: str = ""
+        self,
+        document_id: uuid.UUID,
+        raw_text: str,
+        repo: ChunkRepository,
+        filename: str = "",
     ) -> int:
         """Chunk, embed and store vectors for a document. Returns chunk count."""
         logger.info("Indexing document_id=%s", document_id)
@@ -138,7 +197,7 @@ class RagService:
         """Find relevant chunks and generate an answer."""
         logger.info("RAG query document_id=%s question=%.80s", document_id, question)
         query_emb = self._embed_query(question)
-        chunks = repo.similarity_search(document_id, query_emb, top_k=TOP_K)
+        chunks = self._hybrid_search(document_id, question, query_emb, repo)
 
         if not chunks:
             return {
