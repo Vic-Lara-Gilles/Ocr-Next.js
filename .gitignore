@@ -4,6 +4,18 @@
 .env.local
 !.env.example
 
+# Private keys & certificates
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.jks
+
+# Uploaded / processed documents (may contain sensitive data)
+uploads/
+*.pdf
+
 # Python
 __pycache__/
 *.py[cod]

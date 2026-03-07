@@ -43,9 +43,9 @@ services:
   db:
     image: pgvector/pgvector:pg15
     environment:
-      POSTGRES_USER: ocr
-      POSTGRES_PASSWORD: ocr
-      POSTGRES_DB: ocr
+      POSTGRES_USER: ${POSTGRES_USER:-ocr}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ocr}
+      POSTGRES_DB: ${POSTGRES_DB:-ocr}
     ports:
       - "5432:5432"
     volumes:

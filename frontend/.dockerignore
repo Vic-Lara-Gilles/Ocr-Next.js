@@ -1,6 +1,10 @@
 node_modules
 .next
 .pnpm-store
-.env.local
+.env
+.env.*
+!.env.example
 .git
 .gitignore
+*.pem
+*.key
