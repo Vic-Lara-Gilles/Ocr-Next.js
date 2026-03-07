@@ -1,6 +1,5 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import type { ReactElement } from "react";
 
@@ -14,8 +13,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useDocuments } from "@/hooks/useDocuments";
 import { useIndexDocument } from "@/hooks/useRag";
-import { listDocuments } from "@/services/api";
 import { DocumentStatus } from "@/types/document";
 
 function badgeVariant(status: DocumentStatus): "default" | "secondary" | "destructive" | "outline" {
@@ -32,10 +31,7 @@ function badgeVariant(status: DocumentStatus): "default" | "secondary" | "destru
 }
 
 export function DocumentList(): ReactElement {
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ["documents"],
-    queryFn: listDocuments,
-  });
+  const { documents, isLoading, isError } = useDocuments();
   const { mutate: indexDoc, isPending, variables: indexingId } = useIndexDocument();
 
   if (isLoading) {
@@ -61,7 +57,7 @@ export function DocumentList(): ReactElement {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {(data ?? []).map((document) => (
+          {documents.map((document) => (
             <TableRow key={document.id}>
               <TableCell>{document.filename}</TableCell>
               <TableCell>{document.pages_count}</TableCell>
