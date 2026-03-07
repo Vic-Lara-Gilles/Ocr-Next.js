@@ -15,33 +15,33 @@ Sistema de extracción de texto, tablas y datos estructurados desde documentos P
 ## Tech Stack
 
 ### Backend
-| Tecnología | Propósito |
-|---|---|
-| FastAPI | Framework API REST |
-| SQLAlchemy | ORM y modelos de datos |
-| Alembic | Migraciones de base de datos |
+| Tecnología               | Propósito                                     |
+| ------------------------ | --------------------------------------------- |
+| FastAPI                  | Framework API REST                            |
+| SQLAlchemy               | ORM y modelos de datos                        |
+| Alembic                  | Migraciones de base de datos                  |
 | PostgreSQL 15 + pgvector | Base de datos relacional + búsqueda vectorial |
-| Redis 7 | Message broker para Celery |
-| Celery | Cola de tareas asíncronas |
-| Google Gemini 2.5 Flash | Motor OCR y modelo de chat |
-| Gemini Embedding 001 | Embeddings para búsqueda semántica |
-| OpenCV | Preprocesamiento de imágenes |
-| pdf2image + Poppler | Conversión PDF → imágenes |
-| Pydantic Settings | Configuración tipada vía variables de entorno |
+| Redis 7                  | Message broker para Celery                    |
+| Celery                   | Cola de tareas asíncronas                     |
+| Google Gemini 2.5 Flash  | Motor OCR y modelo de chat                    |
+| Gemini Embedding 001     | Embeddings para búsqueda semántica            |
+| OpenCV                   | Preprocesamiento de imágenes                  |
+| pdf2image + Poppler      | Conversión PDF → imágenes                     |
+| Pydantic Settings        | Configuración tipada vía variables de entorno |
 
 ### Frontend
-| Tecnología | Propósito |
-|---|---|
-| Next.js 16 | Framework React con App Router |
-| React 19 | Librería de UI |
-| TypeScript 5 | Tipado estático |
-| Tailwind CSS 4 | Estilos utilitarios |
-| TanStack React Query | Estado del servidor y caching |
-| Axios | Cliente HTTP |
-| shadcn/ui | Componentes de UI |
-| react-dropzone | Subida de archivos drag & drop |
-| sonner | Notificaciones toast |
-| lucide-react | Iconografía |
+| Tecnología           | Propósito                      |
+| -------------------- | ------------------------------ |
+| Next.js 16           | Framework React con App Router |
+| React 19             | Librería de UI                 |
+| TypeScript 5         | Tipado estático                |
+| Tailwind CSS 4       | Estilos utilitarios            |
+| TanStack React Query | Estado del servidor y caching  |
+| Axios                | Cliente HTTP                   |
+| shadcn/ui            | Componentes de UI              |
+| react-dropzone       | Subida de archivos drag & drop |
+| sonner               | Notificaciones toast           |
+| lucide-react         | Iconografía                    |
 
 ## Arquitectura
 
@@ -89,25 +89,25 @@ Pages → Components → Hooks → Services → Types
 
 ### Principios SOLID aplicados
 
-| Principio | Implementación |
-|---|---|
-| **SRP** | Cada servicio tiene una única responsabilidad: `PDFService` (preprocesamiento), `GeminiOCRService` (OCR), `UploadService` (flujo de subida), `RagService` (búsqueda y chat) |
-| **OCP** | `OCRService(ABC)` permite agregar nuevos providers sin modificar los existentes. `ResultViewer` acepta prop `renderers` para intercambiar renderizadores |
-| **LSP** | `GeminiOCRService` extiende `OCRService` cumpliendo el contrato `process_image()` |
-| **ISP** | Interfaces pequeñas y enfocadas — un hook por operación de datos |
-| **DIP** | Configuración centralizada vía `pydantic BaseSettings`, repositorios inyectados vía constructor |
+| Principio | Implementación                                                                                                                                                              |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **SRP**   | Cada servicio tiene una única responsabilidad: `PDFService` (preprocesamiento), `GeminiOCRService` (OCR), `UploadService` (flujo de subida), `RagService` (búsqueda y chat) |
+| **OCP**   | `OCRService(ABC)` permite agregar nuevos providers sin modificar los existentes. `ResultViewer` acepta prop `renderers` para intercambiar renderizadores                    |
+| **LSP**   | `GeminiOCRService` extiende `OCRService` cumpliendo el contrato `process_image()`                                                                                           |
+| **ISP**   | Interfaces pequeñas y enfocadas — un hook por operación de datos                                                                                                            |
+| **DIP**   | Configuración centralizada vía `pydantic BaseSettings`, repositorios inyectados vía constructor                                                                             |
 
 ## API Endpoints
 
-| Método | Ruta | Descripción |
-|---|---|---|
-| `GET` | `/health` | Health check |
-| `POST` | `/api/upload` | Subir PDF (multipart/form-data) |
-| `POST` | `/api/process/{id}` | Reprocesar documento vía Celery |
-| `GET` | `/api/results/{id}` | Obtener documento con resultados OCR |
-| `GET` | `/api/documents` | Listar todos los documentos |
-| `POST` | `/api/rag/{id}` | Indexar documento para búsqueda RAG |
-| `POST` | `/api/chat/{id}` | Hacer pregunta sobre documento indexado |
+| Método | Ruta                | Descripción                             |
+| ------ | ------------------- | --------------------------------------- |
+| `GET`  | `/health`           | Health check                            |
+| `POST` | `/api/upload`       | Subir PDF (multipart/form-data)         |
+| `POST` | `/api/process/{id}` | Reprocesar documento vía Celery         |
+| `GET`  | `/api/results/{id}` | Obtener documento con resultados OCR    |
+| `GET`  | `/api/documents`    | Listar todos los documentos             |
+| `POST` | `/api/rag/{id}`     | Indexar documento para búsqueda RAG     |
+| `POST` | `/api/chat/{id}`    | Hacer pregunta sobre documento indexado |
 
 ### Ejemplo: Subir un PDF
 
@@ -177,26 +177,26 @@ Todas las extracciones siguen este formato JSON:
 
 ### Tabla `documents`
 
-| Columna | Tipo | Descripción |
-|---|---|---|
-| `id` | UUID (PK) | Identificador único |
-| `filename` | VARCHAR(255) | Nombre del archivo original |
-| `status` | ENUM | `pending`, `processing`, `completed`, `failed` |
-| `pages_count` | INTEGER | Número de páginas del PDF |
-| `raw_text` | TEXT | Texto plano extraído |
-| `structured_json` | JSON | Resultado estructurado (texto + tablas + campos) |
-| `created_at` | TIMESTAMPTZ | Fecha de creación |
-| `updated_at` | TIMESTAMPTZ | Última actualización |
+| Columna           | Tipo         | Descripción                                      |
+| ----------------- | ------------ | ------------------------------------------------ |
+| `id`              | UUID (PK)    | Identificador único                              |
+| `filename`        | VARCHAR(255) | Nombre del archivo original                      |
+| `status`          | ENUM         | `pending`, `processing`, `completed`, `failed`   |
+| `pages_count`     | INTEGER      | Número de páginas del PDF                        |
+| `raw_text`        | TEXT         | Texto plano extraído                             |
+| `structured_json` | JSON         | Resultado estructurado (texto + tablas + campos) |
+| `created_at`      | TIMESTAMPTZ  | Fecha de creación                                |
+| `updated_at`      | TIMESTAMPTZ  | Última actualización                             |
 
 ### Tabla `document_chunks`
 
-| Columna | Tipo | Descripción |
-|---|---|---|
-| `id` | UUID (PK) | Identificador único |
-| `document_id` | UUID (FK) | Referencia al documento |
-| `chunk_index` | INTEGER | Índice del fragmento |
-| `content` | TEXT | Texto del fragmento con metadata |
-| `embedding` | VECTOR(768) | Embedding vectorial (Gemini Embedding 001) |
+| Columna       | Tipo        | Descripción                                |
+| ------------- | ----------- | ------------------------------------------ |
+| `id`          | UUID (PK)   | Identificador único                        |
+| `document_id` | UUID (FK)   | Referencia al documento                    |
+| `chunk_index` | INTEGER     | Índice del fragmento                       |
+| `content`     | TEXT        | Texto del fragmento con metadata           |
+| `embedding`   | VECTOR(768) | Embedding vectorial (Gemini Embedding 001) |
 
 ## Despliegue con Docker
 
@@ -236,13 +236,13 @@ docker compose up --build -d
 
 Esto crea 5 contenedores en la red `ocr-network`:
 
-| Servicio | Puerto | Descripción |
-|---|---|---|
-| `frontend` | 3000 | Interfaz web Next.js |
-| `backend` | 8000 | API REST FastAPI |
-| `db` | 5432 | PostgreSQL 15 + pgvector |
-| `redis` | 6379 | Redis 7 (broker Celery) |
-| `celery` | — | Worker para procesamiento asíncrono |
+| Servicio   | Puerto | Descripción                         |
+| ---------- | ------ | ----------------------------------- |
+| `frontend` | 3000   | Interfaz web Next.js                |
+| `backend`  | 8000   | API REST FastAPI                    |
+| `db`       | 5432   | PostgreSQL 15 + pgvector            |
+| `redis`    | 6379   | Redis 7 (broker Celery)             |
+| `celery`   | —      | Worker para procesamiento asíncrono |
 
 ### 4. Ejecutar migraciones de base de datos
 
@@ -305,27 +305,27 @@ docker compose down -v
 
 #### Backend (`backend/.env`)
 
-| Variable | Requerida | Default | Descripción |
-|---|---|---|---|
-| `GEMINI_API_KEY` | Sí | — | API key de Google AI Studio |
-| `DATABASE_URL` | Sí | — | URL de conexión PostgreSQL |
-| `REDIS_URL` | Sí | — | URL de conexión Redis |
-| `MAX_SYNC_PAGES` | No | `5` | Páginas máximas para procesamiento síncrono |
-| `TEMP_DIR` | No | `/tmp/ocr_uploads` | Directorio temporal para PDFs |
+| Variable         | Requerida | Default            | Descripción                                 |
+| ---------------- | --------- | ------------------ | ------------------------------------------- |
+| `GEMINI_API_KEY` | Sí        | —                  | API key de Google AI Studio                 |
+| `DATABASE_URL`   | Sí        | —                  | URL de conexión PostgreSQL                  |
+| `REDIS_URL`      | Sí        | —                  | URL de conexión Redis                       |
+| `MAX_SYNC_PAGES` | No        | `5`                | Páginas máximas para procesamiento síncrono |
+| `TEMP_DIR`       | No        | `/tmp/ocr_uploads` | Directorio temporal para PDFs               |
 
 #### Frontend (`frontend/.env.local`)
 
-| Variable | Requerida | Default | Descripción |
-|---|---|---|---|
-| `NEXT_PUBLIC_API_URL` | Sí | — | URL base del backend API |
+| Variable              | Requerida | Default | Descripción              |
+| --------------------- | --------- | ------- | ------------------------ |
+| `NEXT_PUBLIC_API_URL` | Sí        | —       | URL base del backend API |
 
 #### Docker Compose (opcionales)
 
-| Variable | Default | Descripción |
-|---|---|---|
-| `POSTGRES_USER` | `ocr` | Usuario de PostgreSQL |
-| `POSTGRES_PASSWORD` | `ocr` | Contraseña de PostgreSQL |
-| `POSTGRES_DB` | `ocr` | Nombre de la base de datos |
+| Variable            | Default | Descripción                |
+| ------------------- | ------- | -------------------------- |
+| `POSTGRES_USER`     | `ocr`   | Usuario de PostgreSQL      |
+| `POSTGRES_PASSWORD` | `ocr`   | Contraseña de PostgreSQL   |
+| `POSTGRES_DB`       | `ocr`   | Nombre de la base de datos |
 
 > En producción, define `POSTGRES_PASSWORD` como variable de entorno con un valor seguro.
 
