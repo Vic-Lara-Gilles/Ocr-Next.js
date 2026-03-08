@@ -4,18 +4,20 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-	GEMINI_API_KEY: str
-	DATABASE_URL: str
-	REDIS_URL: str
-	MAX_SYNC_PAGES: int = 5
-	TEMP_DIR: str = "/tmp/ocr_uploads"
+    GEMINI_API_KEY: str
+    DATABASE_URL: str
+    REDIS_URL: str
+    JWT_SECRET: str = "change-me-in-production"
+    JWT_EXPIRATION_MINUTES: int = 60
+    MAX_SYNC_PAGES: int = 5
+    TEMP_DIR: str = "/tmp/ocr_uploads"
 
-	model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
-	return Settings()
+    return Settings()
 
 
 settings = get_settings()

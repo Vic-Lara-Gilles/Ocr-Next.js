@@ -1,3 +1,3 @@
-from app.routes import process, rag, results, upload
+from app.routes import auth, process, rag, results, upload
 
-__all__ = ["upload", "process", "results", "rag"]
+__all__ = ["auth", "upload", "process", "results", "rag"]

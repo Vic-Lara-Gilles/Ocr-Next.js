@@ -4,7 +4,9 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.dependencies import get_current_user
 from app.logger import get_logger
+from app.models.user import User
 from app.schemas.document import DocumentRead
 from app.services.upload_service import UploadService
 
@@ -15,7 +17,9 @@ router = APIRouter(prefix="/api", tags=["upload"])
 
 @router.post("/upload", response_model=DocumentRead)
 async def upload_document(
-    file: UploadFile = File(...), db: Session = Depends(get_db)
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> DocumentRead:
     if file.content_type != "application/pdf" and not file.filename.lower().endswith(
         ".pdf"
@@ -28,5 +32,5 @@ async def upload_document(
         raise HTTPException(status_code=400, detail="Only PDF files are accepted")
 
     service = UploadService(db)
-    document = service.process_upload(file)
+    document = service.process_upload(file, user_id=current_user.id)
     return DocumentRead.model_validate(document)

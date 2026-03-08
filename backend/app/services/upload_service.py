@@ -39,7 +39,9 @@ class UploadService:
         os.replace(staging_path, final_path)
         return final_path
 
-    def process_upload(self, file: UploadFile) -> Document:
+    def process_upload(
+        self, file: UploadFile, user_id: uuid.UUID | None = None
+    ) -> Document:
         """Handle the full upload flow: save, create record, dispatch task."""
         staging_path = self._save_staging_file(file)
 
@@ -49,6 +51,7 @@ class UploadService:
                 filename=file.filename,
                 pages_count=pages_count,
                 status=DocumentStatus.PENDING,
+                user_id=user_id,
             )
             logger.info(
                 "Document created id=%s filename=%s pages=%d",
@@ -58,10 +61,14 @@ class UploadService:
             )
 
             self._move_to_final_path(staging_path, document.id)
-            document = self._repository.update_status(document, DocumentStatus.PROCESSING)
+            document = self._repository.update_status(
+                document, DocumentStatus.PROCESSING
+            )
             process_document_task.delay(str(document.id))
 
-            logger.info("Dispatching async task id=%s pages=%d", document.id, pages_count)
+            logger.info(
+                "Dispatching async task id=%s pages=%d", document.id, pages_count
+            )
             return document
         except Exception:
             if os.path.exists(staging_path):

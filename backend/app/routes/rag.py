@@ -7,7 +7,9 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.dependencies import get_current_user
 from app.logger import get_logger
+from app.models.user import User
 from app.repositories.chunk_repository import ChunkRepository
 from app.repositories.document_repository import DocumentRepository
 from app.services.rag_service import RagService
@@ -38,10 +40,14 @@ class ChatResponse(BaseModel):
 
 
 @router.post("/rag/{document_id}", response_model=IndexResponse)
-def index_document(document_id: UUID, db: Session = Depends(get_db)) -> IndexResponse:
+def index_document(
+    document_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> IndexResponse:
     doc_repo = DocumentRepository(db)
     document = doc_repo.get_by_id(document_id)
-    if document is None:
+    if document is None or document.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Document not found")
     if document.status != "completed":
         raise HTTPException(
@@ -68,10 +74,11 @@ def chat(
     document_id: UUID,
     body: ChatRequest = Body(...),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> ChatResponse:
     doc_repo = DocumentRepository(db)
     document = doc_repo.get_by_id(document_id)
-    if document is None:
+    if document is None or document.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Document not found")
 
     chunk_repo = ChunkRepository(db)

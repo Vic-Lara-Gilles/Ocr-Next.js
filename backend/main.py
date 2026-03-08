@@ -4,7 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.logger import get_logger
-from app.routes import process, results, upload, rag
+from app.routes import process, results, upload, rag, auth
 
 logger = get_logger("ocr.api")
 
@@ -18,6 +18,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth.router)
 app.include_router(upload.router)
 app.include_router(process.router)
 app.include_router(results.router)
