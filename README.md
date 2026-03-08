@@ -11,6 +11,8 @@ Sistema de extracción de texto, tablas y datos estructurados desde documentos P
 - **RAG con búsqueda híbrida** — Chunking semántico, embeddings vectoriales (pgvector) y full-text search con re-ranking RRF
 - **Chat sobre documentos** — Interfaz de chat para hacer preguntas sobre el contenido de cualquier documento procesado
 - **Descarga de resultados** — Exporta texto plano o JSON estructurado desde la interfaz
+- **Autenticación** — Registro e inicio de sesión con bcrypt + JWT (HS256). Todas las rutas protegidas por token Bearer
+- **Dark mode** — Tema oscuro/claro con toggle manual y detección automática del sistema (next-themes)
 
 ## Tech Stack
 
@@ -28,6 +30,8 @@ Sistema de extracción de texto, tablas y datos estructurados desde documentos P
 | OpenCV                   | Preprocesamiento de imágenes                  |
 | pdf2image + Poppler      | Conversión PDF → imágenes                     |
 | Pydantic Settings        | Configuración tipada vía variables de entorno |
+| bcrypt                   | Hash seguro de contraseñas                    |
+| PyJWT                    | Generación y validación de tokens JWT         |
 
 ### Frontend
 | Tecnología           | Propósito                      |
@@ -42,6 +46,7 @@ Sistema de extracción de texto, tablas y datos estructurados desde documentos P
 | react-dropzone       | Subida de archivos drag & drop |
 | sonner               | Notificaciones toast           |
 | lucide-react         | Iconografía                    |
+| next-themes          | Tema oscuro/claro del sistema  |
 
 ## Arquitectura
 
@@ -71,9 +76,10 @@ Routes → Services → Repositories → Models → Database
 ```
 
 - **Routes** — Controladores delgados: validan input, delegan a services/repositories, retornan esquemas Pydantic
-- **Services** — Lógica de negocio: `UploadService`, `PDFService`, `GeminiOCRService`, `RagService`
-- **Repositories** — Acceso a datos: `DocumentRepository`, `ChunkRepository` (SQLAlchemy ORM)
-- **Models** — Entidades: `Document`, `DocumentChunk`
+- **Services** — Lógica de negocio: `UploadService`, `PDFService`, `GeminiOCRService`, `RagService`, `AuthService`
+- **Repositories** — Acceso a datos: `DocumentRepository`, `ChunkRepository`, `UserRepository` (SQLAlchemy ORM)
+- **Models** — Entidades: `Document`, `DocumentChunk`, `User`
+- **Dependencies** — `get_current_user()` extrae y valida JWT del header `Authorization: Bearer`
 
 ### Frontend (Component Architecture)
 
@@ -81,11 +87,11 @@ Routes → Services → Repositories → Models → Database
 Pages → Components → Hooks → Services → Types
 ```
 
-- **Pages** — App Router: landing, dashboard, results/[id], chat/[id]
-- **Components** — Organizados por feature: upload/, results/, documents/
-- **Hooks** — Encapsulan toda la comunicación con el servidor (TanStack Query)
-- **Services** — Cliente Axios centralizado
-- **Types** — Interfaces TypeScript que reflejan los esquemas del backend
+- **Pages** — App Router: landing, dashboard, results/[id], chat/[id], login, register
+- **Components** — Organizados por feature: upload/, results/, documents/, ProtectedRoute
+- **Hooks** — Encapsulan toda la comunicación con el servidor (TanStack Query) + `useAuth` (contexto de sesión)
+- **Services** — Cliente Axios centralizado con interceptor de token Bearer
+- **Types** — Interfaces TypeScript que reflejan los esquemas del backend (document, auth)
 
 ### Principios SOLID aplicados
 
@@ -99,20 +105,53 @@ Pages → Components → Hooks → Services → Types
 
 ## API Endpoints
 
+### Autenticación (públicos)
+
+| Método | Ruta                 | Descripción                               |
+| ------ | -------------------- | ----------------------------------------- |
+| `GET`  | `/health`            | Health check                              |
+| `POST` | `/api/auth/register` | Registrar usuario (name, email, password) |
+| `POST` | `/api/auth/login`    | Iniciar sesión (email, password)          |
+
+### Recursos protegidos (requieren `Authorization: Bearer <token>`)
+
 | Método | Ruta                | Descripción                             |
 | ------ | ------------------- | --------------------------------------- |
-| `GET`  | `/health`           | Health check                            |
+| `GET`  | `/api/auth/me`      | Obtener perfil del usuario autenticado  |
 | `POST` | `/api/upload`       | Subir PDF (multipart/form-data)         |
 | `POST` | `/api/process/{id}` | Reprocesar documento vía Celery         |
 | `GET`  | `/api/results/{id}` | Obtener documento con resultados OCR    |
-| `GET`  | `/api/documents`    | Listar todos los documentos             |
+| `GET`  | `/api/documents`    | Listar documentos del usuario           |
 | `POST` | `/api/rag/{id}`     | Indexar documento para búsqueda RAG     |
 | `POST` | `/api/chat/{id}`    | Hacer pregunta sobre documento indexado |
+
+### Ejemplo: Registrar usuario y obtener token
+
+```bash
+curl -X POST http://localhost:8000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Juan", "email": "juan@ejemplo.com", "password": "secreto123"}'
+```
+
+Respuesta:
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIs...",
+  "token_type": "bearer",
+  "user": {
+    "id": "77d50f44-...",
+    "name": "Juan",
+    "email": "juan@ejemplo.com",
+    "created_at": "2026-03-07T12:00:00Z"
+  }
+}
+```
 
 ### Ejemplo: Subir un PDF
 
 ```bash
 curl -X POST http://localhost:8000/api/upload \
+  -H "Authorization: Bearer <token>" \
   -F "file=@documento.pdf"
 ```
 
@@ -134,10 +173,12 @@ Respuesta:
 
 ```bash
 # 1. Indexar documento (una sola vez)
-curl -X POST http://localhost:8000/api/rag/a1b2c3d4-...
+curl -X POST http://localhost:8000/api/rag/a1b2c3d4-... \
+  -H "Authorization: Bearer <token>"
 
 # 2. Hacer preguntas
 curl -X POST http://localhost:8000/api/chat/a1b2c3d4-... \
+  -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{"question": "¿Cuál es el monto total?"}'
 ```
@@ -180,6 +221,7 @@ Todas las extracciones siguen este formato JSON:
 | Columna           | Tipo         | Descripción                                      |
 | ----------------- | ------------ | ------------------------------------------------ |
 | `id`              | UUID (PK)    | Identificador único                              |
+| `user_id`         | UUID (FK)    | Referencia al usuario propietario (nullable)     |
 | `filename`        | VARCHAR(255) | Nombre del archivo original                      |
 | `status`          | ENUM         | `pending`, `processing`, `completed`, `failed`   |
 | `pages_count`     | INTEGER      | Número de páginas del PDF                        |
@@ -197,6 +239,16 @@ Todas las extracciones siguen este formato JSON:
 | `chunk_index` | INTEGER     | Índice del fragmento                       |
 | `content`     | TEXT        | Texto del fragmento con metadata           |
 | `embedding`   | VECTOR(768) | Embedding vectorial (Gemini Embedding 001) |
+
+### Tabla `users`
+
+| Columna           | Tipo         | Descripción                  |
+| ----------------- | ------------ | ---------------------------- |
+| `id`              | UUID (PK)    | Identificador único          |
+| `name`            | VARCHAR(100) | Nombre del usuario           |
+| `email`           | VARCHAR(255) | Email (único, indexado)      |
+| `hashed_password` | VARCHAR(255) | Hash bcrypt de la contraseña |
+| `created_at`      | TIMESTAMPTZ  | Fecha de creación            |
 
 ## Despliegue con Docker
 
@@ -217,8 +269,9 @@ cd Ocr-Next.js
 ```bash
 # Backend
 cp backend/.env.example backend/.env
-# Editar backend/.env y configurar la API key de Gemini:
+# Editar backend/.env y configurar:
 #   GEMINI_API_KEY=tu-api-key-real
+#   JWT_SECRET=una-cadena-secreta-larga-y-aleatoria
 
 # Frontend
 cp frontend/.env.example frontend/.env.local
@@ -305,13 +358,15 @@ docker compose down -v
 
 #### Backend (`backend/.env`)
 
-| Variable         | Requerida | Default            | Descripción                                 |
-| ---------------- | --------- | ------------------ | ------------------------------------------- |
-| `GEMINI_API_KEY` | Sí        | —                  | API key de Google AI Studio                 |
-| `DATABASE_URL`   | Sí        | —                  | URL de conexión PostgreSQL                  |
-| `REDIS_URL`      | Sí        | —                  | URL de conexión Redis                       |
-| `MAX_SYNC_PAGES` | No        | `5`                | Páginas máximas para procesamiento síncrono |
-| `TEMP_DIR`       | No        | `/tmp/ocr_uploads` | Directorio temporal para PDFs               |
+| Variable                 | Requerida | Default                   | Descripción                                 |
+| ------------------------ | --------- | ------------------------- | ------------------------------------------- |
+| `GEMINI_API_KEY`         | Sí        | —                         | API key de Google AI Studio                 |
+| `DATABASE_URL`           | Sí        | —                         | URL de conexión PostgreSQL                  |
+| `REDIS_URL`              | Sí        | —                         | URL de conexión Redis                       |
+| `MAX_SYNC_PAGES`         | No        | `5`                       | Páginas máximas para procesamiento síncrono |
+| `JWT_SECRET`             | No        | `change-me-in-production` | Clave secreta para firmar tokens JWT        |
+| `JWT_EXPIRATION_MINUTES` | No        | `60`                      | Tiempo de expiración del token (minutos)    |
+| `TEMP_DIR`               | No        | `/tmp/ocr_uploads`        | Directorio temporal para PDFs               |
 
 #### Frontend (`frontend/.env.local`)
 
@@ -334,7 +389,7 @@ docker compose down -v
 - **CORS**: Cambiar `allow_origins=["*"]` en `main.py` por los dominios específicos del frontend
 - **PostgreSQL**: Usar una contraseña segura vía `POSTGRES_PASSWORD` en el entorno
 - **HTTPS**: Configurar un reverse proxy (Nginx, Traefik) con certificados TLS
-- **Autenticación**: Agregar JWT o API keys si se manejan documentos sensibles
+- **JWT_SECRET**: Definir un valor seguro y único en producción (mínimo 32 caracteres aleatorios)
 - **Volúmenes**: Los datos de PostgreSQL persisten en el volumen `postgres_data`
 - **Monitoreo**: Los logs estructurados del backend se escriben a stdout — integrar con un sistema de logging centralizado
 
@@ -354,21 +409,22 @@ docker compose down -v
 │       ├── config.py           # Settings con pydantic-settings
 │       ├── database.py         # Engine SQLAlchemy + SessionLocal
 │       ├── logger.py           # Logger estructurado
-│       ├── models/             # Document, DocumentChunk
-│       ├── schemas/            # Pydantic: DocumentRead, DocumentResult
-│       ├── repositories/       # DocumentRepository, ChunkRepository
-│       ├── services/           # UploadService, PDFService, GeminiOCRService, RagService
-│       ├── routes/             # upload, process, results, rag
+│       ├── dependencies.py     # get_current_user (JWT auth)
+│       ├── models/             # Document, DocumentChunk, User
+│       ├── schemas/            # Pydantic: DocumentRead, UserRead, TokenResponse
+│       ├── repositories/       # DocumentRepository, ChunkRepository, UserRepository
+│       ├── services/           # UploadService, PDFService, GeminiOCRService, RagService, AuthService
+│       ├── routes/             # auth, upload, process, results, rag
 │       └── tasks/              # Celery app + ocr_task
 ├── frontend/
 │   ├── Dockerfile              # Node 20 Alpine + pnpm
 │   ├── package.json            # Dependencias Node
 │   └── src/
-│       ├── app/                # App Router: landing, dashboard, results/[id], chat/[id]
-│       ├── components/         # upload/, results/, documents/, ui/
-│       ├── hooks/              # useUpload, useDocumentStatus, useDocuments, useRag
-│       ├── services/           # api.ts (Axios client)
-│       └── types/              # document.ts (interfaces TypeScript)
+│       ├── app/                # App Router: landing, dashboard, results/[id], chat/[id], login, register
+│       ├── components/         # upload/, results/, documents/, ui/, ProtectedRoute, Navbar
+│       ├── hooks/              # useUpload, useDocumentStatus, useDocuments, useRag, useAuth
+│       ├── services/           # api.ts (Axios client + Bearer interceptor)
+│       └── types/              # document.ts, auth.ts (interfaces TypeScript)
 └── .github/
     ├── copilot-instructions.md # Instrucciones generales del proyecto
     └── instructions/           # Reglas por contexto (backend, frontend, docker, commits)
