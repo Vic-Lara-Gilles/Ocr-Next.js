@@ -1,11 +1,41 @@
 import axios, { AxiosInstance } from "axios";
 
+import { AuthTokenResponse, LoginPayload, RegisterPayload, User } from "@/types/auth";
 import { ChatResponse, Document, IndexResponse } from "@/types/document";
 
 const apiClient: AxiosInstance = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL,
   timeout: 60000,
 });
+
+apiClient.interceptors.request.use((config) => {
+  if (typeof window !== "undefined") {
+    const token = localStorage.getItem("access_token");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+  }
+  return config;
+});
+
+// ── Auth ──
+
+export async function registerUser(payload: RegisterPayload): Promise<AuthTokenResponse> {
+  const response = await apiClient.post<AuthTokenResponse>("/api/auth/register", payload);
+  return response.data;
+}
+
+export async function loginUser(payload: LoginPayload): Promise<AuthTokenResponse> {
+  const response = await apiClient.post<AuthTokenResponse>("/api/auth/login", payload);
+  return response.data;
+}
+
+export async function getMe(): Promise<User> {
+  const response = await apiClient.get<User>("/api/auth/me");
+  return response.data;
+}
+
+// ── Documents ──
 
 export async function uploadDocument(file: File): Promise<Document> {
   const formData = new FormData();
