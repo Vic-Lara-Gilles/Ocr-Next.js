@@ -62,7 +62,7 @@ export function UploadZone(): ReactElement {
   }, [isDragActive]);
 
   return (
-    <Card className="w-full max-w-2xl border-0 bg-white/85 shadow-2xl backdrop-blur-sm">
+    <Card className="w-full max-w-2xl border-0 bg-card/90 shadow-2xl backdrop-blur-sm">
       <CardHeader>
         <CardTitle className="text-2xl">Sube tu PDF</CardTitle>
         <CardDescription>
