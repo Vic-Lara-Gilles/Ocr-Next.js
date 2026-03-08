@@ -10,6 +10,9 @@ sqlalchemy
 alembic
 python-dotenv
 pydantic-settings
+pydantic[email]
 celery
 redis
 pgvector
+bcrypt
+PyJWT
